@@ -1,0 +1,72 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: aki-detection-alerts
+  namespace: sharq
+  labels:
+    app: aki-detection
+    release: prometheus
+spec:
+  groups:
+    - name: aki_inference_alerts
+      interval: 30s
+      rules:
+        # Alert 1: Pod down
+        - alert: AKIDetectionDown
+          expr: up{job="aki-detection-service"} == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "AKI Detection service is down"
+            description: "Pod {{ $labels.pod }} has been down for more than 2 minutes"
+
+        # Alert 2: High pager failure rate
+        - alert: AKIPagerHighFailureRate
+          expr: rate(aki_pager_failures_total[5m]) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High pager failure rate detected"
+            description: "Pager failure rate is {{ $value }} failures/sec over 5 minutes"
+
+        # Alert 3: MLLP reconnection storm
+        - alert: AKIMLLPReconnectionStorm
+          expr: rate(aki_mllp_reconnections_total[5m]) > 0.5
+          for: 3m
+          labels:
+            severity: warning
+          annotations:
+            summary: "MLLP reconnection storm detected"
+            description: "MLLP reconnecting {{ $value }} times/sec - check network stability"
+
+        # Alert 4: High processing latency
+        - alert: AKIHighLatency
+          expr: histogram_quantile(0.95, rate(aki_processing_latency_seconds_bucket[5m])) > 3
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "P95 latency exceeds 3s SLA"
+            description: "P95 latency is {{ $value }}s (SLA: <3s)"
+
+        # Alert 5: No messages received (system idle)
+        - alert: AKINoMessages
+          expr: rate(aki_messages_received_total[10m]) == 0
+          for: 15m
+          labels:
+            severity: info
+          annotations:
+            summary: "No messages received for 15 minutes"
+            description: "System may be idle or MLLP connection lost"
+
+        # Alert 6: High error message rate
+        - alert: AKIHighErrorMessageRate
+          expr: rate(aki_error_messages_total[5m]) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High error message rate detected"
+            description: "Error message rate is {{ $value }} errors/sec from source {{ $labels.source }}"

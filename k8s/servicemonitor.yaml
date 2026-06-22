@@ -1,0 +1,17 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: aki-detection-monitor
+  namespace: sharq
+  labels:
+    app: aki-detection
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: aki-detection
+  endpoints:
+    - port: metrics
+      interval: 15s
+      path: /metrics
+      scrapeTimeout: 10s

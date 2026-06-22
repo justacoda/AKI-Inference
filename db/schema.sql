@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS patients (
+    PID INTEGER PRIMARY KEY,
+    Age INTEGER,
+    Sex INTEGER,
+    Creatinine_Count INTEGER DEFAULT 0,
+    Max_Creatinine REAL DEFAULT 0.0,
+    Min_Creatinine REAL DEFAULT 999999.0,
+    First_Creatinine REAL,
+    Last_Creatinine REAL,
+    Creatinine_Mean REAL DEFAULT 0.0,
+    Creatinine_Std REAL DEFAULT 0.0,
+    Creatinine_Change REAL DEFAULT 0.0,
+    Creatinine_CV REAL DEFAULT 0.0,
+    Creatinine_Max_Change REAL DEFAULT 0.0,
+    Creatinine_Max_Consec_Increase REAL DEFAULT 0.0,
+    Creatinine_Max_Consec_Decrease REAL DEFAULT 0.0,
+    Creatinine_Increase_Count INTEGER DEFAULT 0,
+    Creatinine_Count_Since_Peak INTEGER DEFAULT 0,
+    Creatinine_gt1p5_Count INTEGER DEFAULT 0,
+    Creatinine_Last_gt130_Count INTEGER DEFAULT 0,
+    To_Send_Positive_AKI_Msg_Timestamp TEXT
+);

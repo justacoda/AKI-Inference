@@ -1,0 +1,142 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: aki-detection-state
+  namespace: sharq
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: managed-csi
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aki-config
+  namespace: sharq
+data:
+  mllp_address: "sharq-simulator.coursework6:8440"
+  pager_address: "sharq-simulator.coursework6:8441"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aki-detection
+  namespace: sharq
+  labels:
+    app: aki-detection
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aki-detection
+  template:
+    metadata:
+      labels:
+        app: aki-detection
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      initContainers:
+        - name: copy-hospital-history
+          image: imperialswemlsspring2026.azurecr.io/coursework6-history
+          volumeMounts:
+            - name: hospital-history
+              mountPath: /data
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+
+      containers:
+        - name: aki-detection
+          image: imperialswemlsspring2026.azurecr.io/sharq/aki-inference:latest
+          imagePullPolicy: Always
+
+          env:
+            - name: MLLP_ADDRESS
+              valueFrom:
+                configMapKeyRef:
+                  name: aki-config
+                  key: mllp_address
+            - name: PAGER_ADDRESS
+              valueFrom:
+                configMapKeyRef:
+                  name: aki-config
+                  key: pager_address
+            - name: DB_PATH
+              value: "/state"
+            - name: HISTORY_PATH
+              value: "/data/history.csv"
+            - name: PYTHONUNBUFFERED
+              value: "1"
+
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+
+          volumeMounts:
+            - name: aki-detection-state
+              mountPath: /state
+            - name: hospital-history
+              mountPath: /data
+              readOnly: true
+
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+
+      volumes:
+        - name: hospital-history
+          emptyDir:
+            sizeLimit: 50Mi
+        - name: aki-detection-state
+          persistentVolumeClaim:
+            claimName: aki-detection-state
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aki-detection-service
+  namespace: sharq
+  labels:
+    app: aki-detection
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
+  selector:
+    app: aki-detection
